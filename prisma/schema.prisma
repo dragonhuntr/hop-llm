@@ -1,0 +1,85 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Visibility {
+  public
+  private
+}
+
+enum DocumentKind {
+  text
+  code
+}
+
+model User {
+  id       String       @id @default(uuid())
+  email    String       @unique @db.VarChar(64)
+  password String?      @db.VarChar(64)
+  chats    Chat[]
+  documents Document[]
+  suggestions Suggestion[]
+}
+
+model Chat {
+  id        String    @id @default(uuid())
+  createdAt DateTime
+  title     String    @db.Text
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  visibility Visibility @default(private)
+  messages  Message[]
+  votes     Vote[]
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id])
+  role      String
+  content   Json
+  createdAt DateTime
+  votes     Vote[]
+}
+
+model Vote {
+  chatId    String
+  messageId String
+  chat      Chat    @relation(fields: [chatId], references: [id])
+  message   Message @relation(fields: [messageId], references: [id])
+  isUpvoted Boolean
+
+  @@id([chatId, messageId])
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  createdAt DateTime
+  title     String   @db.Text
+  content   String?  @db.Text
+  kind      DocumentKind @default(text)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  suggestions Suggestion[]
+
+  @@unique([id, createdAt])
+}
+
+model Suggestion {
+  id               String   @id @default(uuid())
+  documentId       String
+  documentCreatedAt DateTime
+  document         Document @relation(fields: [documentId, documentCreatedAt], references: [id, createdAt])
+  originalText     String   @db.Text
+  suggestedText    String   @db.Text
+  description      String?  @db.Text
+  isResolved       Boolean  @default(false)
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  createdAt        DateTime
+}

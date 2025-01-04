@@ -1,8 +1,19 @@
-import { put } from '@vercel/blob';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-
 import { auth } from '@/app/(auth)/auth';
+
+// Initialize S3 client
+// https://supabase.com/docs/guides/storage/s3/authentication?queryGroups=language&language=javascript
+const s3Client = new S3Client({
+  forcePathStyle: true,
+  region: process.env.AWS_REGION,
+  endpoint: process.env.AWS_S3_ENDPOINT,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+});
 
 // Use Blob instead of File since File is not available in Node.js environment
 const FileSchema = z.object({
@@ -32,37 +43,35 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get('file') as Blob;
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
-    }
+    // Validate the file
+    const parsedFile = FileSchema.parse({ file });
 
-    const validatedFile = FileSchema.safeParse({ file });
+    // Get fileName from formData since Blob doesn't have name property
+    const fileName = `${Date.now()}-${(formData.get('file') as File).name}`;
 
-    if (!validatedFile.success) {
-      const errorMessage = validatedFile.error.errors
-        .map((error) => error.message)
-        .join(', ');
+    // Convert Blob to Buffer
+    const arrayBuffer = await parsedFile.file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
-      return NextResponse.json({ error: errorMessage }, { status: 400 });
-    }
+    // Upload the file to AWS S3
+    const uploadCommand = new PutObjectCommand({
+      Bucket: process.env.AWS_S3_BUCKET_NAME!,
+      Key: fileName,
+      Body: buffer,
+      ContentType: parsedFile.file.type,
+    });
 
-    // Get filename from formData since Blob doesn't have name property
-    const filename = (formData.get('file') as File).name;
-    const fileBuffer = await file.arrayBuffer();
+    await s3Client.send(uploadCommand);
 
-    try {
-      const data = await put(`${filename}`, fileBuffer, {
-        access: 'public',
-      });
+    const url = `https://${process.env.PROJECT_ID}.supabase.co/storage/v1/object/public/${process.env.AWS_S3_BUCKET_NAME}/${fileName}`;;
+    const contentType = parsedFile.file.type;
 
-      return NextResponse.json(data);
-    } catch (error) {
-      return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
-    }
+    return NextResponse.json({
+      url,
+      name: fileName,
+      contentType,
+    });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to process request' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 }

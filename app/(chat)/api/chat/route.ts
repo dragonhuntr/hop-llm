@@ -24,7 +24,7 @@ import {
   saveMessages,
   saveSuggestions,
 } from '@/prisma/queries';
-import type { Suggestion } from '@/prisma/schema.';
+import type { Suggestion } from '@/prisma/schema';
 import {
   generateUUID,
   getMostRecentUserMessage,
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
 
   await saveMessages({
     messages: [
-      { ...userMessage, id: userMessageId, createdAt: new Date(), chatId: id },
+      { ...userMessage, id: userMessageId, createdAt: new Date(), chatId: id, content: JSON.stringify(userMessage.content) },
     ],
   });
 
@@ -393,6 +393,12 @@ export async function POST(request: Request) {
                 await saveSuggestions({
                   suggestions: suggestions.map((suggestion) => ({
                     ...suggestion,
+                    id: suggestion.id,
+                    documentId: suggestion.documentId,
+                    originalText: suggestion.originalText,
+                    suggestedText: suggestion.suggestedText,
+                    description: suggestion.description,
+                    isResolved: suggestion.isResolved,
                     userId,
                     createdAt: new Date(),
                     documentCreatedAt: document.createdAt,
@@ -430,7 +436,7 @@ export async function POST(request: Request) {
                       id: messageId,
                       chatId: id,
                       role: message.role,
-                      content: message.content,
+                      content: JSON.stringify(message.content),
                       createdAt: new Date(),
                     };
                   },
@@ -469,7 +475,7 @@ export async function DELETE(request: Request) {
   try {
     const chat = await getChatById({ id });
 
-    if (chat.userId !== session.user.id) {
+    if (chat?.userId !== session.user.id) {
       return new Response('Unauthorized', { status: 401 });
     }
 

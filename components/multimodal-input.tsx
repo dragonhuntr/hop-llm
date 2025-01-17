@@ -67,7 +67,6 @@ function PureMultimodalInput({
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
-  const [isDragOver, setIsDragOver] = useState(false);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -79,6 +78,13 @@ function PureMultimodalInput({
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight + 2}px`;
+    }
+  };
+
+  const resetHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = '98px';
     }
   };
 
@@ -120,6 +126,7 @@ function PureMultimodalInput({
 
     setAttachments([]);
     setLocalStorageInput('');
+    resetHeight();
 
     if (width && width > 768) {
       textareaRef.current?.focus();
@@ -186,43 +193,6 @@ function PureMultimodalInput({
     [setAttachments],
   );
 
-  const handleDrop = useCallback(
-    async (event: React.DragEvent<HTMLTextAreaElement>) => {
-      event.preventDefault();
-      setIsDragOver(false);
-      const files = Array.from(event.dataTransfer.files);
-
-      setUploadQueue(files.map((file) => file.name));
-
-      try {
-        const uploadPromises = files.map((file) => uploadFile(file));
-        const uploadedAttachments = await Promise.all(uploadPromises);
-        const successfullyUploadedAttachments = uploadedAttachments.filter(
-          (attachment) => attachment !== undefined,
-        );
-
-        setAttachments((currentAttachments) => [
-          ...currentAttachments,
-          ...successfullyUploadedAttachments,
-        ]);
-      } catch (error) {
-        console.error('Error uploading files!', error);
-      } finally {
-        setUploadQueue([]);
-      }
-    },
-    [setAttachments],
-  );
-
-  const handleDragOver = (event: React.DragEvent<HTMLTextAreaElement>) => {
-    event.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragOver(false);
-  };
-
   return (
     <div className="relative w-full flex flex-col gap-4">
       {messages.length === 0 &&
@@ -243,15 +213,12 @@ function PureMultimodalInput({
       {(attachments.length > 0 || uploadQueue.length > 0) && (
         <div className="flex flex-row gap-2 overflow-x-scroll items-end">
           {attachments.map((attachment) => (
-            <PreviewAttachment
-              key={`${attachment.url}-${attachment.name}`}
-              attachment={attachment}
-            />
+            <PreviewAttachment key={attachment.url} attachment={attachment} />
           ))}
 
           {uploadQueue.map((filename) => (
             <PreviewAttachment
-              key={`uploading-${filename}`}
+              key={filename}
               attachment={{
                 url: '',
                 name: filename,
@@ -271,9 +238,6 @@ function PureMultimodalInput({
         className={cx(
           'min-h-[24px] max-h-[calc(75dvh)] overflow-hidden resize-none rounded-2xl !text-base bg-muted pb-10 dark:border-zinc-700',
           className,
-          {
-            'border-2 border-dashed border-blue-500 bg-blue-100': isDragOver,
-          },
         )}
         rows={2}
         autoFocus
@@ -288,9 +252,6 @@ function PureMultimodalInput({
             }
           }
         }}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
       />
 
       <div className="absolute bottom-0 p-2 w-fit flex flex-row justify-start">

@@ -87,8 +87,6 @@ export async function POST(request: Request) {
 
   const userMessageId = generateUUID();
 
-  console.log(userMessage.content)
-
   await saveMessages({
     messages: [
       { ...userMessage, id: userMessageId, createdAt: new Date(), chatId: id, content: userMessage.content },

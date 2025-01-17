@@ -92,7 +92,7 @@ export async function saveMessages({ messages }: { messages: Array<{
   id: string;
   chatId: string;
   role: string;
-  content: Prisma.InputJsonValue;
+  content: string;
   createdAt: Date;
 }> }) {
   try {

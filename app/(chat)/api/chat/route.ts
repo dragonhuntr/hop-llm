@@ -438,7 +438,7 @@ export async function POST(request: Request) {
                       id: messageId,
                       chatId: id,
                       role: message.role,
-                      content: JSON.stringify(message.content),
+                      content: message.content[0].text,
                       createdAt: new Date(),
                     };
                   },

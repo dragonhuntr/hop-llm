@@ -34,7 +34,12 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
   });
 
   const cookieStore = await cookies();
-  const modelIdFromCookie = cookieStore.get('model-id')?.value;
+  let modelIdFromCookie = cookieStore.get('model-id')?.value ?? DEFAULT_MODEL_NAME;
+
+  if (!cookieStore.get('model-id')) {
+    await cookieStore.set('model-id', DEFAULT_MODEL_NAME);
+  }
+
   const selectedModelId =
     models.find((model) => model.id === modelIdFromCookie)?.id ||
     DEFAULT_MODEL_NAME;

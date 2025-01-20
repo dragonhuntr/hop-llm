@@ -5,6 +5,7 @@ export interface Model {
   label: string;
   apiIdentifier: string;
   description: string;
+  vision: boolean
 }
 
 export const models: Array<Model> = [
@@ -13,24 +14,28 @@ export const models: Array<Model> = [
     label: 'gpt-4o-mini',
     apiIdentifier: 'gpt-4o-mini',
     description: 'For complex, multi-step tasks',
+    vision: true
   },
   {
     id: 'llama3.3',
     label: 'Llama 3.3',
     apiIdentifier: 'llama3.3',
     description: 'For complex, multi-step tasks',
+    vision: false,
   },
   {
-    id: 'Deepseek Coder V2',
-    label: 'Deepseek Coder V2',
-    apiIdentifier: 'deepseek-coder-v2',
-    description: 'For complex, multi-step tasks',
+    id: 'Llama3.2-Vision',
+    label: 'llama3.2-vision',
+    apiIdentifier: 'llama3.2-vision',
+    description: 'For Vision',
+    vision: true,
   },
   {
     id: 'Qwen2.5',
     label: 'qwen2.5-coder',
     apiIdentifier: 'qwen2.5-coder',
     description: 'For complex, multi-step tasks',
+    vision: false,
   },
 ] as const;
 

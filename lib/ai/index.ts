@@ -6,7 +6,7 @@ import { customMiddleware } from './custom-middleware';
 
 const litellm = createOpenAICompatible({
   name: 'litellm',
-  baseURL: 'https://cursor.wai.sh/',
+  baseURL: process.env.LITELLM_ENDPOINT,
   fetch: async (url, request) => {
     return await fetch(url, { ...request });
   },

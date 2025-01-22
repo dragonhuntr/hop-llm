@@ -38,14 +38,7 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
   // Only get cookie if user is not readonly
   let selectedModelId = DEFAULT_MODEL_NAME;
   if (!isReadonly) {
-    const cookieStore = await cookies();
-    const modelIdFromCookie = cookieStore.get('model-id')?.value;
-    
-    if (!modelIdFromCookie) {
-      await cookieStore.set('model-id', DEFAULT_MODEL_NAME);
-    } else {
-      selectedModelId = models.find((model) => model.id === modelIdFromCookie)?.id || DEFAULT_MODEL_NAME;
-    }
+      selectedModelId = models.find((model) => model.id === chat.model)?.id || DEFAULT_MODEL_NAME;
   }
 
   // Get messages after auth check

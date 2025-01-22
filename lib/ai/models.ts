@@ -9,8 +9,8 @@ export interface Model {
 
 export const models: Array<Model> = [
   {
-    id: 'GPT-4o Mini',
-    label: 'gpt-4o-mini',
+    id: 'gpt-4o-mini',
+    label: 'GPT-4o Mini',
     apiIdentifier: 'gpt-4o-mini',
     description: 'For complex, multi-step tasks',
   },
@@ -21,17 +21,17 @@ export const models: Array<Model> = [
     description: 'For complex, multi-step tasks',
   },
   {
-    id: 'Deepseek Coder V2',
+    id: 'deepseek-coder-v2',
     label: 'Deepseek Coder V2',
     apiIdentifier: 'deepseek-coder-v2',
     description: 'For complex, multi-step tasks',
   },
   {
-    id: 'Qwen2.5',
+    id: 'qwen2.5-coder',
     label: 'qwen2.5-coder',
     apiIdentifier: 'qwen2.5-coder',
     description: 'For complex, multi-step tasks',
   },
 ] as const;
 
-export const DEFAULT_MODEL_NAME: string = 'gpt-4o-mini';
+export const DEFAULT_MODEL_NAME: string = 'llama3.3';

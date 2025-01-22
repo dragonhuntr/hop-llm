@@ -27,10 +27,12 @@ export async function saveChat({
   id,
   userId,
   title,
+  model,
 }: {
   id: string;
   userId: string;
   title: string;
+  model: string;
 }) {
   try {
     return await prisma.chat.create({
@@ -39,9 +41,11 @@ export async function saveChat({
         createdAt: new Date(),
         userId,
         title,
+        model,
       }
     });
   } catch (error) {
+    console.log(error)
     console.error('Failed to save chat in database');
     throw error;
   }
@@ -322,6 +326,24 @@ export async function updateChatVisiblityById({
     });
   } catch (error) {
     console.error('Failed to update chat visibility in database');
+    throw error;
+  }
+}
+
+export async function updateChatModelById({
+  chatId,
+  model,
+}: {
+  chatId: string;
+  model: string;
+}) {
+  try {
+    return await prisma.chat.update({
+      where: { id: chatId },
+      data: { model },
+    });
+  } catch (error) {
+    console.error('Failed to update chat model in database', error);
     throw error;
   }
 }

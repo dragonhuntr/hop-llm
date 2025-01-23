@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 
 import { auth } from '@/app/(auth)/auth';
@@ -32,14 +31,10 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
     }
   }
 
-  // Check if user is readonly before getting messages and cookie
   const isReadonly = session?.user?.id !== chat.userId;
   
-  // Only get cookie if user is not readonly
-  let selectedModelId = DEFAULT_MODEL_NAME;
-  if (!isReadonly) {
-      selectedModelId = models.find((model) => model.id === chat.model)?.id || DEFAULT_MODEL_NAME;
-  }
+  let selectedModelId = models.find((model) => model.id === chat.model)?.id || DEFAULT_MODEL_NAME;
+  console.log(selectedModelId)
 
   // Get messages after auth check
   const messagesFromDb = await getMessagesByChatId({ id });

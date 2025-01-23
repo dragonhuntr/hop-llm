@@ -19,11 +19,11 @@ export function CodeBlock({
   const [output, setOutput] = useState<string | null>(null);
   const [tab, setTab] = useState<'code' | 'run'>('code');
 
-  // For inline code, always render with inline styling
+  // For inline code, render with inline styling
   if (inline) {
     return (
       <code
-        className={`${className} text-sm bg-zinc-100 dark:bg-zinc-800 py-0.5 px-1 rounded-md`}
+        className={`${className} inline-block text-sm bg-zinc-100 dark:bg-zinc-800 py-0.5 px-1 rounded-md`}
         {...props}
       >
         {children}
@@ -31,12 +31,12 @@ export function CodeBlock({
     );
   }
 
-  // If parent is a paragraph, render basic code block
+  // For code blocks in paragraphs, render without a div wrapper
   const parent = node.parent;
   if (parent?.type === 'paragraph') {
     return (
       <code
-        className="block text-sm bg-zinc-100 dark:bg-zinc-800 p-4 rounded-md whitespace-pre-wrap break-words"
+        className="block text-sm bg-zinc-100 dark:bg-zinc-800 p-4 rounded-md whitespace-pre-wrap break-words my-4"
         {...props}
       >
         {children}
@@ -44,9 +44,9 @@ export function CodeBlock({
     );
   }
 
-  // Otherwise render full featured code block
+  // For standalone code blocks, use the full featured version
   return (
-    <div className="not-prose">
+    <div className="not-prose my-4">
       {tab === 'code' && (
         <code
           {...props}

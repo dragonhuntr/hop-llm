@@ -23,6 +23,7 @@ import {
   saveDocument,
   saveMessages,
   saveSuggestions,
+  deleteAllChatsByUserId,
 } from '@/prisma/queries';
 import type { Suggestion } from '@/prisma/schema';
 import {
@@ -461,10 +462,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
-
-  if (!id) {
-    return new Response('Not Found', { status: 404 });
-  }
+  const deleteAll = searchParams.get('deleteAll');
 
   const session = await auth();
 
@@ -473,15 +471,31 @@ export async function DELETE(request: Request) {
   }
 
   try {
+    if (deleteAll === 'true') {
+      // Start deletion without waiting for completion
+      deleteAllChatsByUserId({ userId: session.user.id })
+        .catch(error => console.error('Background deletion failed:', error));
+      
+      // Return success immediately for better UX
+      return new Response('Deletion in progress', { status: 202 });
+    }
+
+    if (!id) {
+      return new Response('Not Found', { status: 404 });
+    }
+
     const chat = await getChatById({ id });
 
     if (chat?.userId !== session.user.id) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    await deleteChatById({ id });
+    // Start deletion without waiting for completion
+    deleteChatById({ id })
+      .catch(error => console.error('Background deletion failed:', error));
 
-    return new Response('Chat deleted', { status: 200 });
+    // Return success immediately
+    return new Response('Deletion in progress', { status: 202 });
   } catch (error) {
     return new Response('An error occurred while processing your request', {
       status: 500,

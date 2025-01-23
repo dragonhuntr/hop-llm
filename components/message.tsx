@@ -4,6 +4,7 @@ import type { ChatRequestOptions, Message } from 'ai';
 import cx from 'classnames';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useMemo, useState } from 'react';
+import React from 'react';
 
 import type { Vote } from '@/lib/db/schema';
 
@@ -105,7 +106,21 @@ const PurePreviewMessage = ({
                       message.role === 'user',
                   })}
                 >
-                  <Markdown>{message.content as string}</Markdown>
+                  <Markdown
+                    components={{
+                      p: ({ children, ...props }) => {
+                        const hasCodeBlock = React.Children.toArray(children).some(
+                          child => React.isValidElement(child) && child.type === 'pre'
+                        );
+                        if (hasCodeBlock) {
+                          return <div {...props}>{children}</div>;
+                        }
+                        return <p {...props}>{children}</p>;
+                      }
+                    }}
+                  >
+                    {message.content as string}
+                  </Markdown>
                 </div>
               </div>
             )}

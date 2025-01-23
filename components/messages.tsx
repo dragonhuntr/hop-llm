@@ -5,6 +5,7 @@ import { Overview } from './overview';
 import { memo } from 'react';
 import { Vote } from '@/lib/db/schema';
 import equal from 'fast-deep-equal';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 interface MessagesProps {
   chatId: string;
@@ -21,6 +22,19 @@ interface MessagesProps {
   isBlockVisible: boolean;
 }
 
+interface VirtualItem {
+  index: number;
+  start: number;
+  size: number;
+  key: string | number | bigint;
+}
+
+const MemoizedPreviewMessage = memo(PreviewMessage, (prev, next) => {
+  return prev.message.id === next.message.id && 
+         prev.isLoading === next.isLoading &&
+         equal(prev.vote, next.vote);
+});
+
 function PureMessages({
   chatId,
   isLoading,
@@ -30,8 +44,14 @@ function PureMessages({
   reload,
   isReadonly,
 }: MessagesProps) {
-  const [messagesContainerRef, messagesEndRef] =
-    useScrollToBottom<HTMLDivElement>();
+  const [messagesContainerRef, messagesEndRef] = useScrollToBottom<HTMLDivElement>();
+
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => messagesContainerRef.current,
+    estimateSize: () => 100,
+    overscan: 5
+  });
 
   return (
     <div
@@ -40,42 +60,54 @@ function PureMessages({
     >
       {/* {messages.length === 0 && <Overview />} */}
 
-      {messages.map((message, index) => (
-        <PreviewMessage
-          key={message.id}
-          chatId={chatId}
-          message={message}
-          isLoading={isLoading && messages.length - 1 === index}
-          vote={
-            votes
-              ? votes.find((vote) => vote.messageId === message.id)
-              : undefined
-          }
-          setMessages={setMessages}
-          reload={reload}
-          isReadonly={isReadonly}
-        />
-      ))}
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow: VirtualItem) => {
+          const message = messages[virtualRow.index];
+          return (
+            <div
+              key={message.id}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${virtualRow.size}px`,
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              <MemoizedPreviewMessage
+                chatId={chatId}
+                message={message}
+                isLoading={isLoading && messages.length - 1 === virtualRow.index}
+                vote={votes?.find((v) => v.messageId === message.id)}
+                setMessages={setMessages}
+                reload={reload}
+                isReadonly={isReadonly}
+              />
+            </div>
+          );
+        })}
+      </div>
 
       {isLoading &&
         messages.length > 0 &&
         messages[messages.length - 1].role === 'user' && <ThinkingMessage />}
 
-      <div
-        ref={messagesEndRef}
-        className="shrink-0 min-w-[24px] min-h-[24px]"
-      />
+      <div ref={messagesEndRef} />
     </div>
   );
 }
 
-export const Messages = memo(PureMessages, (prevProps, nextProps) => {
-  if (prevProps.isBlockVisible && nextProps.isBlockVisible) return true;
-
-  if (prevProps.isLoading !== nextProps.isLoading) return false;
-  if (prevProps.isLoading && nextProps.isLoading) return false;
-  if (prevProps.messages.length !== nextProps.messages.length) return false;
-  if (!equal(prevProps.votes, nextProps.votes)) return false;
-
-  return true;
+export const Messages = memo(PureMessages, (prev, next) => {
+  return prev.chatId === next.chatId &&
+         prev.isLoading === next.isLoading &&
+         equal(prev.votes, next.votes) &&
+         equal(prev.messages, next.messages) &&
+         prev.isReadonly === next.isReadonly;
 });

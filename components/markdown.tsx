@@ -4,10 +4,40 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CodeBlock } from './code-block';
 
-const components: Partial<Components> = {
-  // @ts-expect-error
-  code: CodeBlock,
+const defaultComponents: Partial<Components> = {
+  // Handle code blocks at the root level
+  code: ({ node, className, ...props }: any) => {
+    const match = /language-(\w+)/.exec(className || '');
+    const inline = !match && !node?.position?.start.line;
+    if (inline) {
+      return <code {...props} />;
+    }
+    return <CodeBlock node={node} {...props} />;
+  },
+  // Remove the pre wrapper since CodeBlock handles its own container
   pre: ({ children }) => <>{children}</>,
+  // Handle paragraphs that might contain code blocks
+  p: ({ children, ...props }) => {
+    // Check if any child is a code block
+    const hasCodeBlock = React.Children.toArray(children).some(
+      child => React.isValidElement(child) && (child.type === 'pre' || child.type === CodeBlock)
+    );
+
+    // If there's a code block, wrap non-code content in spans to avoid invalid nesting
+    if (hasCodeBlock) {
+      return (
+        <>
+          {React.Children.map(children, child => {
+            if (React.isValidElement(child) && (child.type === 'pre' || child.type === CodeBlock)) {
+              return child;
+            }
+            return <span {...props}>{child}</span>;
+          })}
+        </>
+      );
+    }
+    return <p {...props}>{children}</p>;
+  },
   ol: ({ node, children, ...props }) => {
     return (
       <ol className="list-decimal list-outside ml-4" {...props}>
@@ -95,9 +125,23 @@ const components: Partial<Components> = {
 
 const remarkPlugins = [remarkGfm];
 
-const NonMemoizedMarkdown = ({ children }: { children: string }) => {
+const NonMemoizedMarkdown = ({ 
+  children,
+  components: customComponents = {} 
+}: { 
+  children: string;
+  components?: Partial<Components>;
+}) => {
+  const mergedComponents = {
+    ...defaultComponents,
+    ...customComponents
+  };
+
   return (
-    <ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
+    <ReactMarkdown 
+      remarkPlugins={remarkPlugins} 
+      components={mergedComponents}
+    >
       {children}
     </ReactMarkdown>
   );
@@ -105,5 +149,5 @@ const NonMemoizedMarkdown = ({ children }: { children: string }) => {
 
 export const Markdown = memo(
   NonMemoizedMarkdown,
-  (prevProps, nextProps) => prevProps.children === nextProps.children,
+  (prevProps, nextProps) => prevProps.children === nextProps.children
 );

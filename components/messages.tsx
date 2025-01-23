@@ -69,12 +69,26 @@ function PureMessages({
 }
 
 export const Messages = memo(PureMessages, (prevProps, nextProps) => {
+  // Block visibility check
   if (prevProps.isBlockVisible && nextProps.isBlockVisible) return true;
 
+  // Loading state changes
   if (prevProps.isLoading !== nextProps.isLoading) return false;
-  if (prevProps.isLoading && nextProps.isLoading) return false;
+
+  // Message length check (quick fail)
   if (prevProps.messages.length !== nextProps.messages.length) return false;
-  if (!equal(prevProps.messages, nextProps.messages)) return false;
+
+  // Only do shallow comparison of last message if lengths are same
+  // This covers most common case of new messages being added
+  const prevLastMsg = prevProps.messages[prevProps.messages.length - 1];
+  const nextLastMsg = nextProps.messages[nextProps.messages.length - 1];
+  if (prevLastMsg?.id !== nextLastMsg?.id || 
+      prevLastMsg?.content !== nextLastMsg?.content ||
+      prevLastMsg?.role !== nextLastMsg?.role) {
+    return false;
+  }
+
+  // Votes comparison
   if (!equal(prevProps.votes, nextProps.votes)) return false;
 
   return true;

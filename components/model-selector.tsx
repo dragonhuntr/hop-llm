@@ -40,6 +40,7 @@ export function ModelSelector({
   const handleModelChange = async (modelId: string) => {
     setOpen(false);
     
+    // Apply optimistic update
     startTransition(() => {
       setOptimisticModelId(modelId);
       onModelChange(modelId);
@@ -50,10 +51,9 @@ export function ModelSelector({
       await saveModelId(chatId, modelId);
     } catch (error) {
       console.error('Failed to save model change:', error);
-      // Optionally revert optimistic update on error
+      // Revert optimistic update on error, but only update once
       startTransition(() => {
         setOptimisticModelId(selectedModelId);
-        onModelChange(selectedModelId);
       });
     }
   };

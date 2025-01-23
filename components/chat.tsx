@@ -56,8 +56,14 @@ export const Chat = memo(function Chat({
     initialMessages,
     experimental_throttle: 100,
     onFinish: () => {
+      // Only revalidate once the message is fully complete
       mutate('/api/history');
+      window.dispatchEvent(new Event('message-sent'));
     },
+    onResponse: () => {
+      // Remove event dispatch from onResponse since we only need it once at completion
+      mutate('/api/history');
+    }
   });
 
   const { data: votes } = useSWR<Array<Vote>>(

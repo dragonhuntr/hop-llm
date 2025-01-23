@@ -29,19 +29,27 @@ export function SidebarUserNav({ user }: { user: User }) {
     if (!window.confirm('Are you sure you want to delete all chats? This action cannot be undone.')) {
       return;
     }
-
-    // Optimistically update the UI
-    mutate('/api/history', [], false);
     
     try {
-      await fetch('/api/chat?deleteAll=true', { method: 'DELETE' });
-      // Force revalidate after successful deletion
-      mutate('/api/history');
+      // Start the deletion
+      const response = await fetch('/api/chat?deleteAll=true', { method: 'DELETE' });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete chats');
+      }
+      
+      // Only clear the cache and redirect after successful deletion
+      mutate('/api/history', [], false);
       router.push('/');
+      
+      // Revalidate after a short delay to ensure backend changes are reflected
+      setTimeout(() => {
+        mutate('/api/history');
+      }, 1000);
     } catch (error) {
-      // If there's an error, revalidate to get the actual state
-      mutate('/api/history');
       console.error('Failed to delete chats:', error);
+      // Revalidate to get the actual state
+      mutate('/api/history');
     }
   };
 

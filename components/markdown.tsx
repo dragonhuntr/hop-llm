@@ -18,20 +18,23 @@ const defaultComponents: Partial<Components> = {
   pre: ({ children }) => <>{children}</>,
   // Handle paragraphs that might contain code blocks
   p: ({ children, ...props }) => {
-    // Check if any child is a code block
-    const hasCodeBlock = React.Children.toArray(children).some(
+    // Convert children to array once
+    const childArray = Array.isArray(children) ? children : [children];
+    
+    // Check if any child is a code block using a simple array method
+    const hasCodeBlock = childArray.some(
       child => React.isValidElement(child) && (child.type === 'pre' || child.type === CodeBlock)
     );
 
-    // If there's a code block, wrap non-code content in spans to avoid invalid nesting
+    // If there's a code block, handle each child directly
     if (hasCodeBlock) {
       return (
         <>
-          {React.Children.map(children, child => {
+          {childArray.map((child, index) => {
             if (React.isValidElement(child) && (child.type === 'pre' || child.type === CodeBlock)) {
-              return child;
+              return React.cloneElement(child, { key: index });
             }
-            return <span {...props}>{child}</span>;
+            return <span key={index} {...props}>{child}</span>;
           })}
         </>
       );

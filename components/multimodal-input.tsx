@@ -272,7 +272,7 @@ function PureMultimodalInput({
           'min-h-[24px] max-h-[calc(75dvh)] overflow-hidden resize-none rounded-2xl !text-base bg-muted pb-10 dark:border-zinc-700',
           className,
           {
-            'border-2 border-dashed border-blue-500 bg-blue-100': isDragOver,
+            'border-2 border-dashed border-blue-500 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-500/10': isDragOver,
           },
         )}
         rows={2}

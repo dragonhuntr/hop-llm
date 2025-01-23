@@ -466,18 +466,15 @@ export async function DELETE(request: Request) {
 
   const session = await auth();
 
-  if (!session || !session.user) {
+  if (!session || !session.user || !session.user.id) {
     return new Response('Unauthorized', { status: 401 });
   }
 
   try {
     if (deleteAll === 'true') {
-      // Start deletion without waiting for completion
-      deleteAllChatsByUserId({ userId: session.user.id })
-        .catch(error => console.error('Background deletion failed:', error));
-      
-      // Return success immediately for better UX
-      return new Response('Deletion in progress', { status: 202 });
+      // Wait for deletion to complete
+      await deleteAllChatsByUserId({ userId: session.user.id });
+      return new Response('All chats deleted', { status: 200 });
     }
 
     if (!id) {
@@ -490,12 +487,9 @@ export async function DELETE(request: Request) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    // Start deletion without waiting for completion
-    deleteChatById({ id })
-      .catch(error => console.error('Background deletion failed:', error));
-
-    // Return success immediately
-    return new Response('Deletion in progress', { status: 202 });
+    // Wait for deletion to complete
+    await deleteChatById({ id });
+    return new Response('Chat deleted', { status: 200 });
   } catch (error) {
     return new Response('An error occurred while processing your request', {
       status: 500,

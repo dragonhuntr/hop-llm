@@ -21,9 +21,9 @@ export const models: Array<Model> = [
     description: 'For complex, multi-step tasks',
   },
   {
-    id: 'deepseek-coder-v2',
-    label: 'Deepseek Coder V2',
-    apiIdentifier: 'deepseek-coder-v2',
+    id: 'llama3.2-vision',
+    label: 'Llama 3.2 Vision',
+    apiIdentifier: 'llama3.2-vision',
     description: 'For complex, multi-step tasks',
   },
   {

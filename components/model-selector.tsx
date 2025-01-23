@@ -37,6 +37,27 @@ export function ModelSelector({
     [optimisticModelId]
   );
 
+  const handleModelChange = async (modelId: string) => {
+    setOpen(false);
+    
+    startTransition(() => {
+      setOptimisticModelId(modelId);
+      onModelChange(modelId);
+    });
+    
+    // Save model change in background without triggering revalidation
+    try {
+      await saveModelId(chatId, modelId);
+    } catch (error) {
+      console.error('Failed to save model change:', error);
+      // Optionally revert optimistic update on error
+      startTransition(() => {
+        setOptimisticModelId(selectedModelId);
+        onModelChange(selectedModelId);
+      });
+    }
+  };
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
@@ -55,14 +76,7 @@ export function ModelSelector({
         {models.map((model) => (
           <DropdownMenuItem
             key={model.id}
-            onSelect={() => {
-              setOpen(false);
-              startTransition(async () => {
-                setOptimisticModelId(model.id);
-                onModelChange(model.id);
-                await saveModelId(chatId, model.id);
-              });
-            }}
+            onSelect={() => handleModelChange(model.id)}
             className="gap-4 group/item flex flex-row justify-between items-center"
             data-active={model.id === optimisticModelId}
           >

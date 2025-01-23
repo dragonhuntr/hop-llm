@@ -20,7 +20,7 @@ export async function saveModelId(chatId: string, model: string) {
   // Only update if chat exists
   if (chat) {
     await updateChatModelById({ chatId, model });
-    revalidatePath(`/chat/${chatId}`);
+    // Remove revalidation since we're handling state client-side
   }
 }
 

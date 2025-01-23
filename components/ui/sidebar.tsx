@@ -70,33 +70,36 @@ const SidebarProvider = React.forwardRef<
     const isMobile = useIsMobile();
     const [openMobile, setOpenMobile] = React.useState(false);
 
-    // This is the internal state of the sidebar.
-    // We use openProp and setOpenProp for control from outside the component.
-    const [_open, _setOpen] = React.useState(defaultOpen);
-    const open = openProp ?? _open;
+    // Use a single source of truth for the open state
+    const [internalOpen, setInternalOpen] = React.useState(defaultOpen);
+    const isControlled = openProp !== undefined;
+    const open = isControlled ? openProp : internalOpen;
+
     const setOpen = React.useCallback(
-      (value: boolean | ((value: boolean) => boolean)) => {
-        const openState = typeof value === 'function' ? value(open) : value;
+      (value: boolean | ((prevValue: boolean) => boolean)) => {
+        const newValue = typeof value === 'function' ? value(open) : value;
+        
+        if (!isControlled) {
+          setInternalOpen(newValue);
+        }
+        
         if (setOpenProp) {
-          setOpenProp(openState);
-        } else {
-          _setOpen(openState);
+          setOpenProp(newValue);
         }
 
-        // This sets the cookie to keep the sidebar state.
-        document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+        document.cookie = `${SIDEBAR_COOKIE_NAME}=${newValue}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
       },
-      [setOpenProp, open],
+      [isControlled, open, setOpenProp],
     );
 
-    // Helper to toggle the sidebar.
+    // Helper to toggle the sidebar
     const toggleSidebar = React.useCallback(() => {
       return isMobile
-        ? setOpenMobile((open) => !open)
-        : setOpen((open) => !open);
-    }, [isMobile, setOpen, setOpenMobile]);
+        ? setOpenMobile((prevOpen) => !prevOpen)
+        : setOpen((prevOpen) => !prevOpen);
+    }, [isMobile, setOpen]);
 
-    // Adds a keyboard shortcut to toggle the sidebar.
+    // Keyboard shortcut effect
     React.useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
         if (
@@ -112,8 +115,6 @@ const SidebarProvider = React.forwardRef<
       return () => window.removeEventListener('keydown', handleKeyDown);
     }, [toggleSidebar]);
 
-    // We add a state so that we can do data-state="expanded" or "collapsed".
-    // This makes it easier to style the sidebar with Tailwind classes.
     const state = open ? 'expanded' : 'collapsed';
 
     const contextValue = React.useMemo<SidebarContext>(
@@ -126,15 +127,7 @@ const SidebarProvider = React.forwardRef<
         setOpenMobile,
         toggleSidebar,
       }),
-      [
-        state,
-        open,
-        setOpen,
-        isMobile,
-        openMobile,
-        setOpenMobile,
-        toggleSidebar,
-      ],
+      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
     );
 
     return (
@@ -153,6 +146,7 @@ const SidebarProvider = React.forwardRef<
               className,
             )}
             ref={ref}
+            data-state={state}
             {...props}
           >
             {children}

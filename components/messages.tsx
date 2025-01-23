@@ -28,6 +28,7 @@ function PureMessages({
   setMessages,
   reload,
   isReadonly,
+  isBlockVisible,
 }: MessagesProps) {
   const [messagesContainerRef, messagesEndRef] =
     useScrollToBottom<HTMLDivElement>();
@@ -36,6 +37,7 @@ function PureMessages({
     <div
       ref={messagesContainerRef}
       className="flex flex-col min-w-0 gap-6 flex-1 overflow-y-scroll pt-4"
+      data-block-visible={isBlockVisible}
     >
       {/* {messages.length === 0 && <Overview />} */}
 
@@ -69,8 +71,8 @@ function PureMessages({
 }
 
 export const Messages = memo(PureMessages, (prevProps, nextProps) => {
-  // Block visibility check
-  if (prevProps.isBlockVisible && nextProps.isBlockVisible) return true;
+  // Block visibility check - if either has changed, we should re-render
+  if (prevProps.isBlockVisible !== nextProps.isBlockVisible) return false;
 
   // Loading state changes
   if (prevProps.isLoading !== nextProps.isLoading) return false;

@@ -90,7 +90,7 @@ export async function POST(request: Request) {
 
   await saveMessages({
     messages: [
-      { ...userMessage, id: userMessageId, createdAt: new Date(), chatId: id, content: userMessage.content },
+      { ...userMessage, id: userMessageId, createdAt: new Date(), chatId: id, content: userMessage.content as string },
     ],
   });
 

@@ -31,7 +31,7 @@ export function CodeBlock({
     );
   }
 
-  // For code blocks in paragraphs, render without a div wrapper
+  // For code blocks in paragraphs, render without any wrapper
   const parent = node.parent;
   if (parent?.type === 'paragraph') {
     return (
@@ -44,7 +44,7 @@ export function CodeBlock({
     );
   }
 
-  // For standalone code blocks, use the full featured version
+  // For standalone code blocks, use the full featured version with div wrapper
   return (
     <div className="not-prose my-4">
       {tab === 'code' && (

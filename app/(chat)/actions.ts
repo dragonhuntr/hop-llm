@@ -1,8 +1,6 @@
 'use server';
 
 import { type CoreUserMessage, generateText } from 'ai';
-import { cookies } from 'next/headers';
-import { revalidatePath } from 'next/cache';
 
 import { customModel } from '@/lib/ai';
 import {

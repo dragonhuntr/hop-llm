@@ -32,6 +32,8 @@ import {
   sanitizeResponseMessages,
 } from '@/lib/utils';
 
+import { DEFAULT_TITLE_MODEL_ID } from '@/lib/ai/models';
+
 import { generateTitleFromUserMessage } from '../../actions';
 
 export const maxDuration = 60;
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
   const chat = await getChatById({ id });
 
   if (!chat) {
-    const title = await generateTitleFromUserMessage({ message: userMessage, model: model.apiIdentifier });
+    const title = await generateTitleFromUserMessage({ message: userMessage, model: DEFAULT_TITLE_MODEL_ID });
     await saveChat({ id, userId: session.user.id, title, model: model.apiIdentifier });
   }
 

@@ -1,7 +1,8 @@
 import { PrismaClient, type User, type Chat, type Message, type Document, type Suggestion, Prisma } from '@prisma/client';
 import { genSaltSync, hashSync } from 'bcrypt-ts';
+import { deleteS3Object, getFileNameFromUrl } from '@/lib/s3';
 
-const prisma = new PrismaClient();
+export const prisma = new PrismaClient();
 
 export async function getUser(email: string): Promise<User | null> {
 
@@ -51,6 +52,26 @@ export async function saveChat({
 
 export async function deleteChatById({ id }: { id: string }) {
   try {
+    // Get messages with attachments first
+    const messages = await prisma.message.findMany({
+      where: { 
+        chatId: id,
+        attachments: {
+          isEmpty: false
+        }
+      }
+    });
+
+    // Delete attachments from S3 for each message
+    for (const message of messages) {
+      for (const attachment of message.attachments) {
+        const fileName = getFileNameFromUrl(attachment);
+        if (fileName) {
+          await deleteS3Object(fileName);
+        }
+      }
+    }
+
     // Delete related records first due to foreign key constraints
     await prisma.vote.deleteMany({
       where: { chatId: id }
@@ -298,6 +319,27 @@ export async function deleteMessagesByChatIdAfterTimestamp({
   timestamp: Date;
 }) {
   try {
+    // Get messages to be deleted to handle attachments
+    const messages = await prisma.message.findMany({
+      where: {
+        chatId,
+        createdAt: { gte: timestamp }
+      }
+    });
+
+    // Delete attachments from S3 for each message
+    for (const message of messages) {
+      const content = message.content as any;
+      if (content.experimental_attachments) {
+        for (const attachment of content.experimental_attachments) {
+          const fileName = getFileNameFromUrl(attachment.url);
+          if (fileName) {
+            await deleteS3Object(fileName);
+          }
+        }
+      }
+    }
+
     return await prisma.message.deleteMany({
       where: {
         chatId,
@@ -305,7 +347,7 @@ export async function deleteMessagesByChatIdAfterTimestamp({
       }
     });
   } catch (error) {
-    console.error('Failed to delete messages by id after timestamp from database');
+    console.error('Failed to delete messages by id after timestamp from database', error);
     throw error;
   }
 }
@@ -348,6 +390,27 @@ export async function updateChatModelById({
 
 export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
   try {
+    // Get all messages with attachments first
+    const chats = await prisma.chat.findMany({
+      where: { userId },
+      include: { messages: true }
+    });
+
+    // Delete attachments from S3 for each message
+    for (const chat of chats) {
+      for (const message of chat.messages) {
+        const content = message.content as any;
+        if (content.experimental_attachments) {
+          for (const attachment of content.experimental_attachments) {
+            const fileName = getFileNameFromUrl(attachment.url);
+            if (fileName) {
+              await deleteS3Object(fileName);
+            }
+          }
+        }
+      }
+    }
+
     // Delete related records first due to foreign key constraints
     await prisma.vote.deleteMany({
       where: { 

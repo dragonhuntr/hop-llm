@@ -24,6 +24,7 @@ interface DBAttachment {
   url: string;
   name: string;
   type: string;
+  contentType: string;
 }
 
 // Extend DBMessage to include attachments
@@ -145,7 +146,7 @@ export function convertToUIMessages(
         url: attachment.url,
         name: attachment.name,
         type: attachment.type,
-        contentType: attachment.type
+        contentType: attachment.contentType
       }))
     });
 

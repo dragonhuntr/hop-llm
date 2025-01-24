@@ -81,8 +81,8 @@ model Attachment {
   type      String
   name      String
   url       String
-  messageId String
-  message   Message  @relation(fields: [messageId], references: [id])
+  messageId String?
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
 }
 
 enum Visibility {

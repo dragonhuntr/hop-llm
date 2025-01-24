@@ -29,17 +29,26 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get('file');
     const chatId = formData.get('chatId') as string;
-    const messageId = formData.get('messageId') as string;
 
-    if (!file || !chatId || !messageId) {
+    if (!file || !chatId) {
       return new NextResponse('Missing required fields', { status: 400 });
     }
 
     const validationResult = fileSchema.safeParse({ file });
     if (!validationResult.success) {
       console.error('File validation failed:', validationResult.error);
-      return new NextResponse('Invalid file', { status: 400 });
+      return new NextResponse(
+        JSON.stringify({ 
+          error: validationResult.error.issues[0].message 
+        }), 
+        { 
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
     }
+
+    console.log(validationResult.data.file);
 
     const validatedFile = validationResult.data.file as File;
     const timestamp = Date.now();
@@ -63,7 +72,11 @@ export async function POST(request: Request) {
         type: validatedFile.type,
         name: validatedFile.name,
         url: url,
-        messageId: messageId
+        // we don't want to connect the attachment to a message yet
+        // when message is created, we will connect the attachment to it
+        message: {
+          connect: undefined
+        }
       }
     });
 

@@ -146,6 +146,7 @@ function PureMultimodalInput({
   const uploadFile = async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('chatId', chatId);
 
     try {
       const response = await fetch('/api/files/upload', {

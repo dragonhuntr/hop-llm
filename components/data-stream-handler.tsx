@@ -27,90 +27,48 @@ export function DataStreamHandler({ id }: { id: string }) {
   const { setUserMessageIdFromServer } = useUserMessageId();
   const { setBlock } = useBlock();
   const lastProcessedIndex = useRef(-1);
+  const blockDataRef = useRef(initialBlockData);
 
   useEffect(() => {
-    if (!dataStream?.length) return;
+    if (!dataStream) return;
 
-    const newDeltas = dataStream.slice(lastProcessedIndex.current + 1);
-    lastProcessedIndex.current = dataStream.length - 1;
+    // Process only new items since last check
+    for (let i = lastProcessedIndex.current + 1; i < dataStream.length; i++) {
+      const delta = dataStream[i] as DataStreamDelta;
 
-    (newDeltas as DataStreamDelta[]).forEach((delta: DataStreamDelta) => {
-      if (delta.type === 'user-message-id') {
-        setUserMessageIdFromServer(delta.content as string);
-        return;
+      if (!delta) continue;
+
+      switch (delta.type) {
+        case 'user-message-id':
+          setUserMessageIdFromServer(delta.content as string);
+          break;
+        case 'kind':
+          blockDataRef.current.kind = delta.content as BlockKind;
+          break;
+        case 'title':
+          blockDataRef.current.title = delta.content as string;
+          break;
+        case 'text-delta':
+        case 'code-delta':
+          blockDataRef.current.content += delta.content as string;
+          break;
+        case 'suggestion':
+          blockDataRef.current.suggestions = [
+            ...(blockDataRef.current.suggestions || []),
+            delta.content as Suggestion,
+          ];
+          break;
+        case 'clear':
+          blockDataRef.current = { ...initialBlockData };
+          break;
+        case 'finish':
+          setBlock(blockDataRef.current);
+          blockDataRef.current = { ...initialBlockData };
+          break;
       }
 
-      setBlock((draftBlock) => {
-        if (!draftBlock) {
-          return { ...initialBlockData, status: 'streaming' };
-        }
-
-        switch (delta.type) {
-          case 'id':
-            return {
-              ...draftBlock,
-              documentId: delta.content as string,
-              status: 'streaming',
-            };
-
-          case 'title':
-            return {
-              ...draftBlock,
-              title: delta.content as string,
-              status: 'streaming',
-            };
-
-          case 'kind':
-            return {
-              ...draftBlock,
-              kind: delta.content as BlockKind,
-              status: 'streaming',
-            };
-
-          case 'text-delta':
-            return {
-              ...draftBlock,
-              content: draftBlock.content + (delta.content as string),
-              isVisible:
-                draftBlock.status === 'streaming' &&
-                draftBlock.content.length > 400 &&
-                draftBlock.content.length < 450
-                  ? true
-                  : draftBlock.isVisible,
-              status: 'streaming',
-            };
-
-          case 'code-delta':
-            return {
-              ...draftBlock,
-              content: delta.content as string,
-              isVisible:
-                draftBlock.status === 'streaming' &&
-                draftBlock.content.length > 300 &&
-                draftBlock.content.length < 310
-                  ? true
-                  : draftBlock.isVisible,
-              status: 'streaming',
-            };
-
-          case 'clear':
-            return {
-              ...draftBlock,
-              content: '',
-              status: 'streaming',
-            };
-
-          case 'finish':
-            return {
-              ...draftBlock,
-              status: 'idle',
-            };
-
-          default:
-            return draftBlock;
-        }
-      });
-    });
+      lastProcessedIndex.current = i;
+    }
   }, [dataStream, setBlock, setUserMessageIdFromServer]);
 
   return null;

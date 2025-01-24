@@ -80,18 +80,19 @@ export const Messages = memo(PureMessages, (prevProps, nextProps) => {
   // Message length check (quick fail)
   if (prevProps.messages.length !== nextProps.messages.length) return false;
 
-  // Only do shallow comparison of last message if lengths are same
-  // This covers most common case of new messages being added
-  const prevLastMsg = prevProps.messages[prevProps.messages.length - 1];
-  const nextLastMsg = nextProps.messages[nextProps.messages.length - 1];
-  if (prevLastMsg?.id !== nextLastMsg?.id || 
-      prevLastMsg?.content !== nextLastMsg?.content ||
-      prevLastMsg?.role !== nextLastMsg?.role) {
-    return false;
+  // Deep comparison of messages array using fast-deep-equal
+  if (!equal(prevProps.messages, nextProps.messages)) return false;
+
+  // Votes comparison - only compare if both are defined
+  if (prevProps.votes || nextProps.votes) {
+    if (!equal(prevProps.votes, nextProps.votes)) return false;
   }
 
-  // Votes comparison
-  if (!equal(prevProps.votes, nextProps.votes)) return false;
+  // Compare other props that could trigger re-renders
+  if (prevProps.chatId !== nextProps.chatId ||
+      prevProps.isReadonly !== nextProps.isReadonly) {
+    return false;
+  }
 
   return true;
 });

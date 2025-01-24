@@ -13,6 +13,8 @@ import {
   useCallback,
   useEffect,
   useState,
+  useMemo,
+  useRef,
 } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { useDebounceCallback, useWindowSize } from 'usehooks-ts';
@@ -37,20 +39,21 @@ import equal from 'fast-deep-equal';
 
 export type BlockKind = 'text' | 'code';
 
-export interface UIBlock {
+export type UIBlock = {
+  documentId?: string;
   title: string;
-  documentId: string;
-  kind: BlockKind;
   content: string;
+  kind: BlockKind;
+  status: 'idle' | 'streaming';
   isVisible: boolean;
-  status: 'streaming' | 'idle';
+  suggestions?: Array<Suggestion>;
   boundingBox: {
     top: number;
     left: number;
     width: number;
     height: number;
   };
-}
+};
 
 export interface ConsoleOutput {
   id: string;
@@ -100,101 +103,119 @@ function PureBlock({
   isReadonly: boolean;
 }) {
   const { block, setBlock } = useBlock();
+  const { mutate } = useSWRConfig();
+  const { open: isSidebarOpen } = useSidebar();
+
+  const [mode, setMode] = useState<'edit' | 'diff'>('edit');
+  const [document, setDocument] = useState<Document | null>(null);
+  const [currentVersionIndex, setCurrentVersionIndex] = useState(-1);
+  const [consoleOutputs, setConsoleOutputs] = useState<Array<ConsoleOutput>>([]);
+  const [isContentDirty, setIsContentDirty] = useState(false);
+  const [isToolbarVisible, setIsToolbarVisible] = useState(false);
+
+  // Cache window dimensions to avoid layout thrashing
+  const { width: windowWidth, height: windowHeight } = useWindowSize();
+  const isMobile = windowWidth ? windowWidth < 768 : false;
+  
+  // Memoize dimensions for animations
+  const dimensions = useMemo(() => ({
+    width: isMobile ? windowWidth : windowWidth - 400,
+    height: windowHeight,
+    x: isMobile ? 0 : 400,
+    y: 0
+  }), [isMobile, windowWidth, windowHeight]);
+
+  // Use transform instead of width/height for smoother animations
+  const animationStyles = useMemo(() => ({
+    transform: `translate3d(${dimensions.x}px, ${dimensions.y}px, 0)`,
+    width: dimensions.width,
+    height: dimensions.height,
+    willChange: 'transform'
+  }), [dimensions]);
+
+  // Cache document queries
+  const documentsKey = useMemo(() => 
+    block.documentId !== 'init' && block.status !== 'streaming'
+      ? `/api/document?id=${block.documentId}`
+      : null,
+    [block.documentId, block.status]
+  );
 
   const {
     data: documents,
     isLoading: isDocumentsFetching,
     mutate: mutateDocuments,
-  } = useSWR<Array<Document>>(
-    block.documentId !== 'init' && block.status !== 'streaming'
-      ? `/api/document?id=${block.documentId}`
-      : null,
-    fetcher,
-  );
+  } = useSWR<Array<Document>>(documentsKey, fetcher, {
+    revalidateIfStale: false,
+    revalidateOnFocus: false
+  });
 
-  const { data: suggestions } = useSWR<Array<Suggestion>>(
+  // Cache suggestions query
+  const suggestionsKey = useMemo(() => 
     documents && block && block.status !== 'streaming'
       ? `/api/suggestions?documentId=${block.documentId}`
       : null,
+    [documents, block, block.status, block.documentId]
+  );
+
+  const { data: suggestions } = useSWR<Array<Suggestion>>(
+    suggestionsKey,
     fetcher,
     {
       dedupingInterval: 5000,
+      revalidateIfStale: false,
+      revalidateOnFocus: false
     },
   );
 
-  const [mode, setMode] = useState<'edit' | 'diff'>('edit');
-  const [document, setDocument] = useState<Document | null>(null);
-  const [currentVersionIndex, setCurrentVersionIndex] = useState(-1);
-  const [consoleOutputs, setConsoleOutputs] = useState<Array<ConsoleOutput>>(
-    [],
-  );
-
-  const { open: isSidebarOpen } = useSidebar();
-
+  // Use refs for stable values
+  const mutateRef = useRef(mutate);
   useEffect(() => {
-    if (documents && documents.length > 0) {
-      const mostRecentDocument = documents.at(-1);
-
-      if (mostRecentDocument) {
-        setDocument(mostRecentDocument);
-        setCurrentVersionIndex(documents.length - 1);
-        setBlock((currentBlock) => ({
-          ...currentBlock,
-          content: mostRecentDocument.content ?? '',
-        }));
-      }
-    }
-  }, [documents, setBlock]);
-
-  useEffect(() => {
-    mutateDocuments();
-  }, [block.status, mutateDocuments]);
-
-  const { mutate } = useSWRConfig();
-  const [isContentDirty, setIsContentDirty] = useState(false);
+    mutateRef.current = mutate;
+  }, [mutate]);
 
   const handleContentChange = useCallback(
-    (updatedContent: string) => {
-      if (!block) return;
+    async (updatedContent: string) => {
+      if (!block?.documentId) return;
 
-      mutate<Array<Document>>(
+      mutateRef.current<Array<Document>>(
         `/api/document?id=${block.documentId}`,
         async (currentDocuments) => {
           if (!currentDocuments) return undefined;
 
           const currentDocument = currentDocuments.at(-1);
-
-          if (!currentDocument || !currentDocument.content) {
+          if (!currentDocument?.content) {
             setIsContentDirty(false);
             return currentDocuments;
           }
 
-          if (currentDocument.content !== updatedContent) {
-            await fetch(`/api/document?id=${block.documentId}`, {
-              method: 'POST',
-              body: JSON.stringify({
-                title: block.title,
-                content: updatedContent,
-                kind: block.kind,
-              }),
-            });
+          if (currentDocument.content === updatedContent) {
+            return currentDocuments;
+          }
 
-            setIsContentDirty(false);
+          await fetch(`/api/document?id=${block.documentId}`, {
+            method: 'POST',
+            body: JSON.stringify({
+              title: block.title,
+              content: updatedContent,
+              kind: block.kind,
+            }),
+          });
 
-            const newDocument = {
+          setIsContentDirty(false);
+          return [
+            ...currentDocuments,
+            {
               ...currentDocument,
               content: updatedContent,
               createdAt: new Date(),
-            };
-
-            return [...currentDocuments, newDocument];
-          }
-          return currentDocuments;
+            },
+          ];
         },
         { revalidate: false },
       );
     },
-    [block, mutate],
+    [block]
   );
 
   const debouncedHandleContentChange = useDebounceCallback(
@@ -204,49 +225,66 @@ function PureBlock({
 
   const saveContent = useCallback(
     (updatedContent: string, debounce: boolean) => {
-      if (document && updatedContent !== document.content) {
-        setIsContentDirty(true);
-
-        if (debounce) {
-          debouncedHandleContentChange(updatedContent);
-        } else {
-          handleContentChange(updatedContent);
-        }
+      if (!document || updatedContent === document.content) return;
+      
+      setIsContentDirty(true);
+      if (debounce) {
+        debouncedHandleContentChange(updatedContent);
+      } else {
+        handleContentChange(updatedContent);
       }
     },
     [document, debouncedHandleContentChange, handleContentChange],
   );
 
-  function getDocumentContentById(index: number) {
-    if (!documents) return '';
-    if (!documents[index]) return '';
+  const getDocumentContentById = useCallback((index: number) => {
+    if (!documents?.[index]) return '';
     return documents[index].content ?? '';
-  }
+  }, [documents]);
 
-  const handleVersionChange = (type: 'next' | 'prev' | 'toggle' | 'latest') => {
-    if (!documents) return;
+  const handleVersionChange = useCallback((type: 'next' | 'prev' | 'toggle' | 'latest') => {
+    if (!documents?.length) return;
 
     if (type === 'latest') {
       setCurrentVersionIndex(documents.length - 1);
       setMode('edit');
+      return;
     }
 
     if (type === 'toggle') {
       setMode((mode) => (mode === 'edit' ? 'diff' : 'edit'));
+      return;
     }
 
-    if (type === 'prev') {
-      if (currentVersionIndex > 0) {
-        setCurrentVersionIndex((index) => index - 1);
+    setCurrentVersionIndex((index) => {
+      if (type === 'prev' && index > 0) {
+        return index - 1;
       }
-    } else if (type === 'next') {
-      if (currentVersionIndex < documents.length - 1) {
-        setCurrentVersionIndex((index) => index + 1);
+      if (type === 'next' && index < documents.length - 1) {
+        return index + 1;
       }
-    }
-  };
+      return index;
+    });
+  }, [documents]);
 
-  const [isToolbarVisible, setIsToolbarVisible] = useState(false);
+  // Memoize document update effect
+  useEffect(() => {
+    if (!documents?.length) return;
+    
+    const mostRecentDocument = documents.at(-1);
+    if (!mostRecentDocument) return;
+
+    setDocument(mostRecentDocument);
+    setCurrentVersionIndex(documents.length - 1);
+    setBlock((currentBlock) => ({
+      ...currentBlock,
+      content: mostRecentDocument.content ?? '',
+    }));
+  }, [documents, setBlock]);
+
+  useEffect(() => {
+    mutateDocuments();
+  }, [block.status, mutateDocuments]);
 
   /*
    * NOTE: if there are no documents, or if
@@ -259,38 +297,39 @@ function PureBlock({
       ? currentVersionIndex === documents.length - 1
       : true;
 
-  const { width: windowWidth, height: windowHeight } = useWindowSize();
-  const isMobile = windowWidth ? windowWidth < 768 : false;
-
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       {block.isVisible && (
         <motion.div
           className="flex flex-row h-dvh w-dvw fixed top-0 left-0 z-50 bg-transparent"
-          initial={{ opacity: 1 }}
+          initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
         >
           {!isMobile && (
             <motion.div
-              className="fixed bg-background h-dvh"
-              initial={{
+              className="fixed bg-background h-dvh will-change-[transform,width]"
+              style={{
                 width: isSidebarOpen ? windowWidth - 256 : windowWidth,
                 right: 0,
               }}
-              animate={{ width: windowWidth, right: 0 }}
+              initial={{ scale: 0.98 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 30 }}
             />
           )}
 
           {!isMobile && (
             <motion.div
-              className="relative w-[400px] bg-muted dark:bg-background h-dvh shrink-0"
-              initial={{ opacity: 0, x: 10, scale: 1 }}
+              className="relative w-[400px] bg-muted dark:bg-background h-dvh shrink-0 will-change-transform"
+              initial={{ opacity: 0, x: 10, scale: 0.98 }}
               animate={{
                 opacity: 1,
                 x: 0,
                 scale: 1,
                 transition: {
-                  delay: 0.2,
+                  delay: 0.1,
                   type: 'spring',
                   stiffness: 200,
                   damping: 30,
@@ -298,9 +337,9 @@ function PureBlock({
               }}
               exit={{
                 opacity: 0,
-                x: 0,
-                scale: 1,
-                transition: { duration: 0 },
+                x: 10,
+                scale: 0.98,
+                transition: { duration: 0.2 },
               }}
             >
               <AnimatePresence>
@@ -347,70 +386,26 @@ function PureBlock({
           )}
 
           <motion.div
-            className="fixed dark:bg-muted bg-background h-dvh flex flex-col overflow-y-scroll md:border-l dark:border-zinc-700 border-zinc-200"
-            initial={
-              isMobile
-                ? {
-                    opacity: 1,
-                    x: block.boundingBox.left,
-                    y: block.boundingBox.top,
-                    height: block.boundingBox.height,
-                    width: block.boundingBox.width,
-                    borderRadius: 50,
-                  }
-                : {
-                    opacity: 1,
-                    x: block.boundingBox.left,
-                    y: block.boundingBox.top,
-                    height: block.boundingBox.height,
-                    width: block.boundingBox.width,
-                    borderRadius: 50,
-                  }
-            }
-            animate={
-              isMobile
-                ? {
-                    opacity: 1,
-                    x: 0,
-                    y: 0,
-                    height: windowHeight,
-                    width: windowWidth ? windowWidth : 'calc(100dvw)',
-                    borderRadius: 0,
-                    transition: {
-                      delay: 0,
-                      type: 'spring',
-                      stiffness: 200,
-                      damping: 30,
-                      duration: 5000,
-                    },
-                  }
-                : {
-                    opacity: 1,
-                    x: 400,
-                    y: 0,
-                    height: windowHeight,
-                    width: windowWidth
-                      ? windowWidth - 400
-                      : 'calc(100dvw-400px)',
-                    borderRadius: 0,
-                    transition: {
-                      delay: 0,
-                      type: 'spring',
-                      stiffness: 200,
-                      damping: 30,
-                      duration: 5000,
-                    },
-                  }
-            }
-            exit={{
+            className="fixed dark:bg-muted bg-background h-dvh flex flex-col overflow-y-scroll md:border-l dark:border-zinc-700 border-zinc-200 will-change-transform"
+            style={animationStyles}
+            initial={{
+              scale: 0.98,
               opacity: 0,
-              scale: 0.5,
-              transition: {
-                delay: 0.1,
-                type: 'spring',
-                stiffness: 600,
-                damping: 30,
-              },
+              borderRadius: '50px',
+            }}
+            animate={{
+              scale: 1,
+              opacity: 1,
+              borderRadius: '0px',
+            }}
+            exit={{
+              scale: 0.98,
+              opacity: 0,
+            }}
+            transition={{
+              type: 'spring',
+              stiffness: 300,
+              damping: 30,
             }}
           >
             <div className="p-2 flex flex-row justify-between items-start">
@@ -550,10 +545,17 @@ function PureBlock({
 }
 
 export const Block = memo(PureBlock, (prevProps, nextProps) => {
+  // Quick comparisons first
   if (prevProps.isLoading !== nextProps.isLoading) return false;
-  if (!equal(prevProps.votes, nextProps.votes)) return false;
   if (prevProps.input !== nextProps.input) return false;
-  if (!equal(prevProps.messages, nextProps.messages.length)) return false;
+  if (prevProps.isReadonly !== nextProps.isReadonly) return false;
+  if (prevProps.chatId !== nextProps.chatId) return false;
 
+  // Deep comparisons using fast-deep-equal
+  if (!equal(prevProps.votes, nextProps.votes)) return false;
+  if (!equal(prevProps.messages, nextProps.messages)) return false;
+  if (!equal(prevProps.attachments, nextProps.attachments)) return false;
+
+  // Function references should be stable from parent memoization
   return true;
 });

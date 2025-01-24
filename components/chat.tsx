@@ -2,7 +2,7 @@
 
 import type { Attachment, Message } from 'ai';
 import { useChat } from 'ai/react';
-import { useState } from 'react';
+import { useState, useCallback, useMemo, useRef, type SetStateAction, useEffect } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import dynamic from 'next/dynamic';
 import { memo } from 'react';
@@ -15,14 +15,28 @@ import { Block } from './block';
 import { VisibilityType } from './visibility-selector';
 import { useBlockSelector } from '@/hooks/use-block';
 
-// Dynamically import heavy components
-const DynamicMultimodalInput = dynamic(() => import('./multimodal-input').then(mod => mod.MultimodalInput), {
-  ssr: false
+// Preload dynamic components
+const MultimodalInputPromise = () => import('./multimodal-input').then(mod => mod.MultimodalInput);
+const MessagesPromise = () => import('./messages').then(mod => mod.Messages);
+
+// Dynamically import heavy components with loading state
+const DynamicMultimodalInput = dynamic(MultimodalInputPromise, {
+  ssr: false,
+  loading: () => <div className="h-[50px] w-full bg-muted animate-pulse rounded-lg" />
 });
 
-const DynamicMessages = dynamic(() => import('./messages').then(mod => mod.Messages), {
-  ssr: false
+const DynamicMessages = dynamic(MessagesPromise, {
+  ssr: false,
+  loading: () => <div className="flex-1 flex items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+  </div>
 });
+
+// Preload components on mount
+const preloadComponents = () => {
+  MultimodalInputPromise();
+  MessagesPromise();
+};
 
 export const Chat = memo(function Chat({
   id,
@@ -37,8 +51,46 @@ export const Chat = memo(function Chat({
   selectedVisibilityType: VisibilityType;
   isReadonly: boolean;
 }) {
+  // Preload components on mount
+  useEffect(() => {
+    preloadComponents();
+  }, []);
+
   const { mutate } = useSWRConfig();
   const [currentModelId, setCurrentModelId] = useState(selectedModelId);
+  const [attachments, setAttachments] = useState<Array<Attachment>>([]);
+  
+  // Use refs for event handlers and stable values
+  const messageEventRef = useRef(() => {
+    window.dispatchEvent(new Event('message-sent'));
+  });
+  
+  const mutateRef = useRef(mutate);
+  useEffect(() => {
+    mutateRef.current = mutate;
+  }, [mutate]);
+  
+  // Memoize the mutate callback
+  const handleMutate = useCallback(() => {
+    mutateRef.current('/api/history');
+  }, []);
+
+  // Memoize model change handler
+  const handleModelChange = useCallback((modelId: string) => {
+    setCurrentModelId(modelId);
+  }, []);
+
+  const chatConfig = useMemo(() => ({
+    id,
+    body: { id, modelId: currentModelId },
+    initialMessages,
+    experimental_throttle: 100,
+    onFinish: () => {
+      handleMutate();
+      messageEventRef.current();
+    },
+    onResponse: handleMutate
+  }), [id, currentModelId, initialMessages, handleMutate]);
 
   const {
     messages,
@@ -50,87 +102,91 @@ export const Chat = memo(function Chat({
     isLoading,
     stop,
     reload,
-  } = useChat({
-    id,
-    body: { id, modelId: currentModelId },
-    initialMessages,
-    experimental_throttle: 100,
-    onFinish: () => {
-      // Only revalidate once the message is fully complete
-      mutate('/api/history');
-      window.dispatchEvent(new Event('message-sent'));
-    },
-    onResponse: () => {
-      // Remove event dispatch from onResponse since we only need it once at completion
-      mutate('/api/history');
-    }
+  } = useChat(chatConfig);
+
+  // Memoize SWR key and cache result
+  const votesKey = useMemo(() => `/api/vote?chatId=${id}`, [id]);
+  const { data: votes } = useSWR<Array<Vote>>(votesKey, fetcher, {
+    revalidateIfStale: false,
+    revalidateOnFocus: false
   });
 
-  const { data: votes } = useSWR<Array<Vote>>(
-    `/api/vote?chatId=${id}`,
-    fetcher,
-  );
-
-  const [attachments, setAttachments] = useState<Array<Attachment>>([]);
   const isBlockVisible = useBlockSelector((state) => state.isVisible);
+
+  // Memoize handlers
+  const handleSetInput = useCallback((value: string) => {
+    setInput(value);
+  }, [setInput]);
+
+  const handleSetMessages = useCallback((value: SetStateAction<Message[]>) => {
+    setMessages(value);
+  }, [setMessages]);
+
+  const handleSetAttachments = useCallback((value: SetStateAction<Attachment[]>) => {
+    setAttachments(value);
+  }, []);
+
+  // Memoize props passed to child components
+  const headerProps = useMemo(() => ({
+    chatId: id,
+    selectedModelId: currentModelId,
+    onModelChange: handleModelChange,
+    selectedVisibilityType,
+    isReadonly
+  }), [id, currentModelId, handleModelChange, selectedVisibilityType, isReadonly]);
+
+  const messagesProps = useMemo(() => ({
+    chatId: id,
+    isLoading,
+    votes,
+    messages,
+    setMessages: handleSetMessages,
+    reload,
+    isReadonly,
+    isBlockVisible
+  }), [id, isLoading, votes, messages, handleSetMessages, reload, isReadonly, isBlockVisible]);
+
+  const multimodalInputProps = useMemo(() => ({
+    chatId: id,
+    input,
+    setInput: handleSetInput,
+    handleSubmit,
+    isLoading,
+    stop,
+    attachments,
+    setAttachments: handleSetAttachments,
+    messages,
+    setMessages: handleSetMessages,
+    append
+  }), [id, input, handleSetInput, handleSubmit, isLoading, stop, attachments, handleSetAttachments, messages, handleSetMessages, append]);
+
+  const blockProps = useMemo(() => ({
+    chatId: id,
+    input,
+    setInput: handleSetInput,
+    handleSubmit,
+    isLoading,
+    stop,
+    attachments,
+    setAttachments: handleSetAttachments,
+    append,
+    messages,
+    setMessages: handleSetMessages,
+    reload,
+    votes,
+    isReadonly
+  }), [id, input, handleSetInput, handleSubmit, isLoading, stop, attachments, handleSetAttachments, append, messages, handleSetMessages, reload, votes, isReadonly]);
 
   return (
     <>
       <div className="flex flex-col min-w-0 h-dvh bg-background">
-        <ChatHeader
-          chatId={id}
-          selectedModelId={currentModelId}
-          onModelChange={setCurrentModelId}
-          selectedVisibilityType={selectedVisibilityType}
-          isReadonly={isReadonly}
-        />
-
-        <DynamicMessages
-          chatId={id}
-          isLoading={isLoading}
-          votes={votes}
-          messages={messages}
-          setMessages={setMessages}
-          reload={reload}
-          isReadonly={isReadonly}
-          isBlockVisible={isBlockVisible}
-        />
-
+        <ChatHeader {...headerProps} />
+        <DynamicMessages {...messagesProps} />
         <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
-          {!isReadonly && (
-            <DynamicMultimodalInput
-              chatId={id}
-              input={input}
-              setInput={setInput}
-              handleSubmit={handleSubmit}
-              isLoading={isLoading}
-              stop={stop}
-              attachments={attachments}
-              setAttachments={setAttachments}
-              messages={messages}
-              setMessages={setMessages}
-              append={append}
-            />
-          )}
+          {!isReadonly && <DynamicMultimodalInput {...multimodalInputProps} />}
         </form>
       </div>
-
-      <Block
-        chatId={id}
-        input={input}
-        setInput={setInput}
-        handleSubmit={handleSubmit}
-        isLoading={isLoading}
-        stop={stop}
-        attachments={attachments}
-        setAttachments={setAttachments}
-        append={append}
-        messages={messages}
-        setMessages={setMessages}
-        reload={reload}
-        votes={votes}
-        isReadonly={isReadonly}
-      />
+      <Block {...blockProps} />
     </>
   );
 });

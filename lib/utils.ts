@@ -2,13 +2,34 @@ import type {
   CoreAssistantMessage,
   CoreMessage,
   CoreToolMessage,
-  Message,
+  Message as AIMessage,
   ToolInvocation,
 } from 'ai';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 import type { Message as DBMessage, Document } from '@/lib/db/schema';
+
+// Extend both Message types to include attachments
+export interface Message extends AIMessage {
+  attachments?: Array<{
+    url: string;
+    name: string;
+    type: string;
+    contentType: string;
+  }>;
+}
+
+interface DBAttachment {
+  url: string;
+  name: string;
+  type: string;
+}
+
+// Extend DBMessage to include attachments
+interface ExtendedDBMessage extends DBMessage {
+  attachments?: DBAttachment[];
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -85,7 +106,7 @@ function addToolMessageToChat({
 }
 
 export function convertToUIMessages(
-  messages: Array<DBMessage>,
+  messages: Array<ExtendedDBMessage>,
 ): Array<Message> {
   return messages.reduce((chatMessages: Array<Message>, message) => {
     if (message.role === 'tool') {
@@ -120,6 +141,12 @@ export function convertToUIMessages(
       role: message.role as Message['role'],
       content: textContent,
       toolInvocations,
+      attachments: message.attachments?.map(attachment => ({
+        url: attachment.url,
+        name: attachment.name,
+        type: attachment.type,
+        contentType: attachment.type
+      }))
     });
 
     return chatMessages;

@@ -57,24 +57,17 @@ export async function POST(request: Request) {
 
     const url = `${process.env.AWS_S3_ENDPOINT}/${process.env.AWS_S3_BUCKET_NAME}/${fileName}`;
 
-    // Get current message
-    const message = await prisma.message.findUnique({
-      where: { id: messageId }
-    });
-
-    if (!message) {
-      return new NextResponse('Message not found', { status: 404 });
-    }
-
-    // Update the message with the attachment URL
-    await prisma.message.update({
-      where: { id: messageId },
+    // Create a new attachment record
+    const attachment = await prisma.attachment.create({
       data: {
-        attachments: [...message.attachments, url]
+        type: validatedFile.type,
+        name: validatedFile.name,
+        url: url,
+        messageId: messageId
       }
     });
 
-    return new NextResponse(JSON.stringify({ url }), {
+    return new NextResponse(JSON.stringify({ url, attachment }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

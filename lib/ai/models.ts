@@ -28,5 +28,5 @@ export const models: Array<Model> = [
   },
 ] as const;
 
-export const DEFAULT_MODEL_ID: string = 'llama3.3';
+export const DEFAULT_MODEL_ID: string = 'llama3.2-vision';
 export const DEFAULT_TITLE_MODEL_ID: string = 'llama3.2-vision';

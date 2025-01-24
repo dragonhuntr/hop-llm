@@ -44,7 +44,6 @@ export async function saveChat({
       }
     });
   } catch (error) {
-    console.log(error)
     console.error('Failed to save chat in database');
     throw error;
   }

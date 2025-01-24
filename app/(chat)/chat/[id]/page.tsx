@@ -34,7 +34,6 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
   const isReadonly = session?.user?.id !== chat.userId;
   
   let selectedModelId = models.find((model) => model.id === chat.model)?.id || DEFAULT_MODEL_ID;
-  console.log(selectedModelId)
 
   // Get messages after auth check
   const messagesFromDb = await getMessagesByChatId({ id });

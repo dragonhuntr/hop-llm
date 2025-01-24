@@ -4,18 +4,27 @@ import type { Attachment, Message } from 'ai';
 import { useChat } from 'ai/react';
 import { useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
+import dynamic from 'next/dynamic';
+import { memo } from 'react';
 
 import { ChatHeader } from '@/components/chat-header';
 import type { Vote } from '@/lib/db/schema';
 import { fetcher } from '@/lib/utils';
 
 import { Block } from './block';
-import { MultimodalInput } from './multimodal-input';
-import { Messages } from './messages';
 import { VisibilityType } from './visibility-selector';
 import { useBlockSelector } from '@/hooks/use-block';
 
-export function Chat({
+// Dynamically import heavy components
+const DynamicMultimodalInput = dynamic(() => import('./multimodal-input').then(mod => mod.MultimodalInput), {
+  ssr: false
+});
+
+const DynamicMessages = dynamic(() => import('./messages').then(mod => mod.Messages), {
+  ssr: false
+});
+
+export const Chat = memo(function Chat({
   id,
   initialMessages,
   selectedModelId,
@@ -29,6 +38,7 @@ export function Chat({
   isReadonly: boolean;
 }) {
   const { mutate } = useSWRConfig();
+  const [currentModelId, setCurrentModelId] = useState(selectedModelId);
 
   const {
     messages,
@@ -42,12 +52,18 @@ export function Chat({
     reload,
   } = useChat({
     id,
-    body: { id, modelId: selectedModelId },
+    body: { id, modelId: currentModelId },
     initialMessages,
     experimental_throttle: 100,
     onFinish: () => {
+      // Only revalidate once the message is fully complete
       mutate('/api/history');
+      window.dispatchEvent(new Event('message-sent'));
     },
+    onResponse: () => {
+      // Remove event dispatch from onResponse since we only need it once at completion
+      mutate('/api/history');
+    }
   });
 
   const { data: votes } = useSWR<Array<Vote>>(
@@ -63,12 +79,13 @@ export function Chat({
       <div className="flex flex-col min-w-0 h-dvh bg-background">
         <ChatHeader
           chatId={id}
-          selectedModelId={selectedModelId}
+          selectedModelId={currentModelId}
+          onModelChange={setCurrentModelId}
           selectedVisibilityType={selectedVisibilityType}
           isReadonly={isReadonly}
         />
 
-        <Messages
+        <DynamicMessages
           chatId={id}
           isLoading={isLoading}
           votes={votes}
@@ -81,7 +98,7 @@ export function Chat({
 
         <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
           {!isReadonly && (
-            <MultimodalInput
+            <DynamicMultimodalInput
               chatId={id}
               input={input}
               setInput={setInput}
@@ -116,4 +133,4 @@ export function Chat({
       />
     </>
   );
-}
+});

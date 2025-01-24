@@ -269,7 +269,6 @@ function PureBlock({
           className="flex flex-row h-dvh w-dvw fixed top-0 left-0 z-50 bg-transparent"
           initial={{ opacity: 1 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0, transition: { delay: 0.4 } }}
         >
           {!isMobile && (
             <motion.div
@@ -279,10 +278,6 @@ function PureBlock({
                 right: 0,
               }}
               animate={{ width: windowWidth, right: 0 }}
-              exit={{
-                width: isSidebarOpen ? windowWidth - 256 : windowWidth,
-                right: 0,
-              }}
             />
           )}
 

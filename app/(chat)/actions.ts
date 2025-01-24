@@ -1,19 +1,25 @@
 'use server';
 
 import { type CoreUserMessage, generateText } from 'ai';
-import { cookies } from 'next/headers';
 
 import { customModel } from '@/lib/ai';
 import {
   deleteMessagesByChatIdAfterTimestamp,
   getMessageById,
+  getChatById,
   updateChatVisiblityById,
+  updateChatModelById
 } from '@/prisma/queries';
 import { VisibilityType } from '@/components/visibility-selector';
 
-export async function saveModelId(model: string) {
-  const cookieStore = await cookies();
-  cookieStore.set('model-id', model);
+export async function saveModelId(chatId: string, model: string) {
+  const chat = await getChatById({ id: chatId });
+  
+  // Only update if chat exists
+  if (chat) {
+    await updateChatModelById({ chatId, model });
+    // Remove revalidation since we're handling state client-side
+  }
 }
 
 export async function generateTitleFromUserMessage({

@@ -1,4 +1,3 @@
-
 import { PrismaClient, type User, type Chat, type Message, type Document, type Suggestion, Prisma } from '@prisma/client';
 import { genSaltSync, hashSync } from 'bcrypt-ts';
 
@@ -32,7 +31,7 @@ export async function saveChat({
   id: string;
   userId: string;
   title: string;
-  model: string,
+  model: string;
 }) {
   try {
     return await prisma.chat.create({
@@ -45,6 +44,7 @@ export async function saveChat({
       }
     });
   } catch (error) {
+    console.log(error)
     console.error('Failed to save chat in database');
     throw error;
   }
@@ -343,6 +343,32 @@ export async function updateChatModelById({
     });
   } catch (error) {
     console.error('Failed to update chat model in database', error);
+    throw error;
+  }
+}
+
+export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
+  try {
+    // Delete related records first due to foreign key constraints
+    await prisma.vote.deleteMany({
+      where: { 
+        chat: {
+          userId: userId
+        }
+      }
+    });
+    await prisma.message.deleteMany({
+      where: { 
+        chat: {
+          userId: userId
+        }
+      }
+    });
+    return await prisma.chat.deleteMany({
+      where: { userId }
+    });
+  } catch (error) {
+    console.error('Failed to delete all chats for user from database');
     throw error;
   }
 }

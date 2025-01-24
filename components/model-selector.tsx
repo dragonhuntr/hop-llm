@@ -2,6 +2,7 @@
 
 import { startTransition, useMemo, useOptimistic, useState } from 'react';
 
+import { saveModelId } from '@/app/(chat)/actions';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,20 +17,46 @@ import { CheckCircleFillIcon, ChevronDownIcon } from './icons';
 
 export function ModelSelector({
   selectedModelId,
+  onModelChange,
+  chatId,
   className,
 }: {
   selectedModelId: string;
-} & React.ComponentProps<typeof Button>) {
+  onModelChange: (modelId: string) => void;
+  chatId: string;
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
-  const [optimisticModelId, setOptimisticModelId] =
-    useOptimistic(selectedModelId);
+  const [optimisticModelId, setOptimisticModelId] = useOptimistic(
+    selectedModelId,
+    (state, newModelId: string) => newModelId
+  );
 
   const selectedModel = useMemo(
     () => models.find((model) => model.id === optimisticModelId),
-    [optimisticModelId],
+    [optimisticModelId]
   );
 
-  console.log(selectedModel)
+  const handleModelChange = async (modelId: string) => {
+    setOpen(false);
+    
+    // Apply optimistic update
+    startTransition(() => {
+      setOptimisticModelId(modelId);
+      onModelChange(modelId);
+    });
+    
+    // Save model change in background without triggering revalidation
+    try {
+      await saveModelId(chatId, modelId);
+    } catch (error) {
+      console.error('Failed to save model change:', error);
+      // Revert optimistic update on error, but only update once
+      startTransition(() => {
+        setOptimisticModelId(selectedModelId);
+      });
+    }
+  };
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -49,13 +76,7 @@ export function ModelSelector({
         {models.map((model) => (
           <DropdownMenuItem
             key={model.id}
-            onSelect={() => {
-              setOpen(false);
-
-              startTransition(() => {
-                setOptimisticModelId(model.id);
-              });
-            }}
+            onSelect={() => handleModelChange(model.id)}
             className="gap-4 group/item flex flex-row justify-between items-center"
             data-active={model.id === optimisticModelId}
           >

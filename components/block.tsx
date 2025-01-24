@@ -76,6 +76,7 @@ function PureBlock({
   reload,
   votes,
   isReadonly,
+  isVisionModel,
 }: {
   chatId: string;
   input: string;
@@ -101,6 +102,7 @@ function PureBlock({
     chatRequestOptions?: ChatRequestOptions,
   ) => Promise<string | null | undefined>;
   isReadonly: boolean;
+  isVisionModel: boolean;
 }) {
   const { block, setBlock } = useBlock();
   const { mutate } = useSWRConfig();
@@ -379,6 +381,7 @@ function PureBlock({
                     append={append}
                     className="bg-background dark:bg-muted"
                     setMessages={setMessages}
+                    isVisionModel={isVisionModel}
                   />
                 </form>
               </div>
@@ -550,6 +553,7 @@ export const Block = memo(PureBlock, (prevProps, nextProps) => {
   if (prevProps.input !== nextProps.input) return false;
   if (prevProps.isReadonly !== nextProps.isReadonly) return false;
   if (prevProps.chatId !== nextProps.chatId) return false;
+  if (prevProps.isVisionModel !== nextProps.isVisionModel) return false;
 
   // Deep comparisons using fast-deep-equal
   if (!equal(prevProps.votes, nextProps.votes)) return false;

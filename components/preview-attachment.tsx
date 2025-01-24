@@ -1,19 +1,22 @@
 import type { Attachment } from 'ai';
+import { memo } from 'react';
+import { Button } from './ui/button';
+import { LoaderIcon, CrossSmallIcon } from './icons';
 
-import { LoaderIcon } from './icons';
-
-export const PreviewAttachment = ({
+export const PreviewAttachment = memo(function PreviewAttachment({
   attachment,
   isUploading = false,
+  onDelete,
 }: {
   attachment: Attachment;
   isUploading?: boolean;
-}) => {
+  onDelete?: () => void;
+}) {
   const { name, url, contentType } = attachment;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="w-20 h-16 aspect-video bg-muted rounded-md relative flex flex-col items-center justify-center">
+    <div className="flex flex-col gap-2 group relative">
+      <div className="w-20 h-16 aspect-video bg-muted rounded-md relative flex flex-col items-center justify-center overflow-x">
         {contentType ? (
           contentType.startsWith('image') ? (
             // NOTE: it is recommended to use next/image for images
@@ -21,7 +24,7 @@ export const PreviewAttachment = ({
             <img
               key={url}
               src={url}
-              alt={name ?? 'An image attachment'}
+              alt={name}
               className="rounded-md size-full object-cover"
             />
           ) : (
@@ -36,8 +39,22 @@ export const PreviewAttachment = ({
             <LoaderIcon />
           </div>
         )}
+
+        {!isUploading && onDelete && (
+          <Button
+            size="icon"
+            variant="destructive"
+            className="absolute size-5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelete();
+            }}
+          >
+            <CrossSmallIcon size={12} />
+          </Button>
+        )}
       </div>
-      <div className="text-xs text-zinc-500 max-w-16 truncate">{name}</div>
     </div>
   );
-};
+});

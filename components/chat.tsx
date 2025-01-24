@@ -10,6 +10,7 @@ import { memo } from 'react';
 import { ChatHeader } from '@/components/chat-header';
 import type { Vote } from '@/lib/db/schema';
 import { fetcher } from '@/lib/utils';
+import { models } from '@/lib/ai/models';
 
 import { Block } from './block';
 import { VisibilityType } from './visibility-selector';
@@ -146,6 +147,12 @@ export const Chat = memo(function Chat({
     isBlockVisible
   }), [id, isLoading, votes, messages, handleSetMessages, reload, isReadonly, isBlockVisible]);
 
+  // Get model vision capability
+  const isVisionModel = useMemo(() => {
+    const model = models.find(m => m.id === currentModelId);
+    return model?.vision ?? false;
+  }, [currentModelId]);
+
   const multimodalInputProps = useMemo(() => ({
     chatId: id,
     input,
@@ -157,8 +164,9 @@ export const Chat = memo(function Chat({
     setAttachments: handleSetAttachments,
     messages,
     setMessages: handleSetMessages,
-    append
-  }), [id, input, handleSetInput, handleSubmit, isLoading, stop, attachments, handleSetAttachments, messages, handleSetMessages, append]);
+    append,
+    isVisionModel
+  }), [id, input, handleSetInput, handleSubmit, isLoading, stop, attachments, handleSetAttachments, messages, handleSetMessages, append, isVisionModel]);
 
   const blockProps = useMemo(() => ({
     chatId: id,
@@ -174,8 +182,9 @@ export const Chat = memo(function Chat({
     setMessages: handleSetMessages,
     reload,
     votes,
-    isReadonly
-  }), [id, input, handleSetInput, handleSubmit, isLoading, stop, attachments, handleSetAttachments, append, messages, handleSetMessages, reload, votes, isReadonly]);
+    isReadonly,
+    isVisionModel
+  }), [id, input, handleSetInput, handleSubmit, isLoading, stop, attachments, handleSetAttachments, append, messages, handleSetMessages, reload, votes, isReadonly, isVisionModel]);
 
   return (
     <>

@@ -29,14 +29,14 @@ model Chat {
 }
 
 model Message {
-  id        String   @id @default(uuid())
+  id        String       @id @default(uuid())
   chatId    String
-  chat      Chat     @relation(fields: [chatId], references: [id])
+  chat      Chat         @relation(fields: [chatId], references: [id])
   role      String
   content   Json
-  attachments String[] @default([])
   createdAt DateTime
   votes     Vote[]
+  attachments Attachment[]
 }
 
 model Vote {
@@ -74,6 +74,15 @@ model Suggestion {
   createdAt         DateTime
   document          Document @relation(fields: [documentId, documentCreatedAt], references: [id, createdAt])
   user              User     @relation(fields: [userId], references: [id])
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  type      String
+  name      String
+  url       String
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id])
 }
 
 enum Visibility {

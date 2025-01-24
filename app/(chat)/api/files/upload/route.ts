@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { auth } from '@/app/(auth)/auth';
 import { s3Client } from '@/lib/s3';
 import { prisma } from '@/prisma/queries';
+import { getSignedFileUrl } from '@/lib/s3';
 
 const fileSchema = z.object({
   file: z
@@ -48,11 +49,9 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log(validationResult.data.file);
-
     const validatedFile = validationResult.data.file as File;
     const timestamp = Date.now();
-    const fileName = `${timestamp}-${validatedFile.name}`;
+    const fileName = `${session.user.id}/${timestamp}-${validatedFile.name}`;
     const buffer = Buffer.from(await validatedFile.arrayBuffer());
 
     const command = new PutObjectCommand({
@@ -64,23 +63,26 @@ export async function POST(request: Request) {
 
     await s3Client.send(command);
 
-    const url = `${process.env.AWS_S3_ENDPOINT}/${process.env.AWS_S3_BUCKET_NAME}/${fileName}`;
+    const signedUrl = await getSignedFileUrl(fileName);
 
     // Create a new attachment record
     const attachment = await prisma.attachment.create({
       data: {
         type: validatedFile.type,
         name: validatedFile.name,
-        url: url,
-        // we don't want to connect the attachment to a message yet
-        // when message is created, we will connect the attachment to it
+        url: signedUrl,
         message: {
           connect: undefined
         }
       }
     });
 
-    return new NextResponse(JSON.stringify({ url, attachment }), {
+    return new NextResponse(JSON.stringify({ 
+      url: signedUrl,
+      name: attachment.name,
+      contentType: attachment.type,
+      attachmentId: attachment.id
+    }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

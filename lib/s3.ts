@@ -1,4 +1,5 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // Initialize S3 client
 export const s3Client = new S3Client({
@@ -35,4 +36,14 @@ export function getFileNameFromUrl(url: string): string | null {
     console.error('Failed to parse URL:', error);
     return null;
   }
+}
+
+export async function getSignedFileUrl(key: string) {
+  const command = new GetObjectCommand({
+    Bucket: process.env.AWS_S3_BUCKET_NAME!,
+    Key: key,
+  });
+
+  // URL expires in 7 days
+  return getSignedUrl(s3Client, command, { expiresIn: 7 * 24 * 60 * 60 });
 } 

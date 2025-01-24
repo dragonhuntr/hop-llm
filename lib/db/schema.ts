@@ -114,3 +114,14 @@ export const suggestion = pgTable(
 );
 
 export type Suggestion = InferSelectModel<typeof suggestion>;
+
+export const attachment = pgTable('Attachment', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  type: varchar('type').notNull(),
+  name: varchar('name').notNull(),
+  url: text('url').notNull(),
+  messageId: uuid('messageId').references(() => message.id),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+});
+
+export type Attachment = InferSelectModel<typeof attachment>;
